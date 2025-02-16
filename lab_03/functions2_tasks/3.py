@@ -15,7 +15,7 @@ movies = [
 "name": "Hitman",
 "imdb": 6.3,
 "category": "Action"
-},
+},  
 {
 "name": "Dark Knight",
 "imdb": 9.0,

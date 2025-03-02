@@ -1,0 +1,2 @@
+Hello, World!
+Now I am doing LAB_06

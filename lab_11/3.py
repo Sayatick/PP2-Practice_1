@@ -8,35 +8,47 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-users = [
-    ("Alice", "123456"),
-    ("Bob", "abc123"), # no correct
-    ("Charlie", "9876543210"),
-    ("David", "9876"), # no correct
-    ("Eve", "1234567890123456") # no correvt
-]
+procedure_sql = """
+CREATE OR REPLACE PROCEDURE insert_users_with_check(
+    names TEXT[],
+    phones TEXT[]
+)
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    i INT;
+    invalid_entries TEXT := '';
+BEGIN
+    FOR i IN 1 .. array_length(names, 1) LOOP
+        IF phones[i] ~ '^[0-9]+$' AND length(phones[i]) >= 5 THEN
+            IF EXISTS (SELECT 1 FROM phonebook WHERE name = names[i]) THEN
+                UPDATE phonebook SET phone = phones[i] WHERE name = names[i];
+            ELSE
+                INSERT INTO phonebook(name, phone) VALUES(names[i], phones[i]);
+            END IF;
+        ELSE
+            invalid_entries := invalid_entries || format('(%s, %s), ', names[i], phones[i]);
+        END IF;
+    END LOOP;
 
-NO_correct_data = []
+    RAISE NOTICE 'Invalid entries: %', invalid_entries;
+END;
+$$;
+"""
 
-for name, phone in users:
-    if phone.isdigit() and 5 <= len(phone) <= 15:
-        cur.execute("SELECT * FROM phonebook WHERE name = %s", (name,))
-        existing = cur.fetchone()
-        if existing:
-            cur.execute("UPDATE phonebook SET phone = %s WHERE name = %s", (phone, name))
-        else:
-            cur.execute("INSERT INTO phonebook(name, phone) VALUES (%s, %s)", (name, phone))
-    else:
-        NO_correct_data.append((name, phone))
-
+cur.execute(procedure_sql)
 conn.commit()
+print("Procedure created.")
 
-if NO_correct_data:
-    print("NO correct:")
-    for entry in NO_correct_data:
-        print("Name: ", entry[0]," Phone: ", entry[1])
-else:
-    print("All datas were correct.")
+name_input = input("Enter names: ")
+phone_input = input("Enter phones: ")
+
+names = name_input.strip().split(',')
+phones = phone_input.strip().split(',')
+
+cur.execute("CALL insert_users_with_check(%s, %s);", (names, phones))
+conn.commit()
+print("Data processed!")
 
 cur.close()
 conn.close()

@@ -1,29 +1,43 @@
 import psycopg2
 
-def show_page(limit, offset):
-    conn = psycopg2.connect(
-        host="localhost",
-        dbname="phonebook_db",
-        user="postgres",
-        password="123456"
-    )
-    cur = conn.cursor()
+conn = psycopg2.connect(
+    host="localhost",
+    dbname="phonebook_db",
+    user="postgres",
+    password="123456"
+)
+cur = conn.cursor()
 
-    cur.execute("""SELECT * FROM phonebook ORDER BY id LIMIT %s OFFSET %s""", (limit, offset))
+pagination_function_sql = """
+CREATE OR REPLACE FUNCTION get_paginated_records(limit_count INT, offset_count INT)
+RETURNS TABLE(id INT, name TEXT, phone TEXT)
+AS $$
+BEGIN
+    RETURN QUERY
+    SELECT id, name, phone
+    FROM phonebook
+    ORDER BY id
+    LIMIT limit_count OFFSET offset_count;
+END;
+$$ LANGUAGE plpgsql;
+"""
 
-    rows = cur.fetchall()
+cur.execute(pagination_function_sql)
+conn.commit()
+print("Pagination function created successfully.\n")
 
-    if rows:
-        for row in rows:
-            print("ID: ", row[0], "Name: ", row[1], "Phone: ",row[2])
-    else:
-        print("No data found for this page.")
+limit = int(input("Enter how many records to display per page (LIMIT): "))
+offset = int(input("Enter how many records to skip (OFFSET): "))
 
-    cur.close()
-    conn.close()
+cur.execute("SELECT * FROM get_paginated_records(%s, %s);", (limit, offset))
+rows = cur.fetchall()
 
-page = int(input("Enter page number: "))
-limit = 2
-offset = (page - 1) * limit
+print("\nPaginated Results:")
+if rows:
+    for row in rows:
+        print("ID: ", row[0]," Name:", row[1]," Phone: ", row[2])
+else:
+    print("No data found!")
 
-show_page(limit, offset)
+cur.close()
+conn.close()

@@ -8,20 +8,29 @@ conn = psycopg2.connect(
 )
 cur = conn.cursor()
 
-n_name = input("Enter a new name: ")
-n_phone = input("Enter a new phone number: ")
+procedure_sql = """
+CREATE OR REPLACE PROCEDURE insert_or_update_user(p_name VARCHAR, p_phone VARCHAR)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM phonebook WHERE name = p_name) THEN
+        UPDATE phonebook SET phone = p_phone WHERE name = p_name;
+    ELSE
+        INSERT INTO phonebook(name, phone) VALUES(p_name, p_phone);
+    END IF;
+END;
+$$;
+"""
 
-cur.execute("""SELECT * FROM phonebook""")
-c_name = cur.fetchone()
-
-if c_name:
-    cur.execute("""UPDATE phonebook SET phone = %s WHERE name = %s""", (n_phone, n_name))
-    print("Updated !!!")
-else:
-    cur.execute("""INSERT INTO phonebook(name, phone) VALUES(%s, %s)""", (n_name, n_phone))
-    print("Inserted !!!")
-
+cur.execute(procedure_sql)
 conn.commit()
+print("Procedure created successfully.")
 
+name = input("Enter name: ")
+phone = input("Enter phone: ")
+
+cur.execute("CALL insert_or_update_user(%s, %s);", (name, phone))
+conn.commit()
+print("Procedure executed.")
 cur.close()
 conn.close()
